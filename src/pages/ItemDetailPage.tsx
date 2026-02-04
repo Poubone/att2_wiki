@@ -354,9 +354,9 @@ export default function ItemDetailPage() {
                 {avgChance !== null && (
                   <div className="p-4 bg-secondary/50 border-2 border-border text-center">
                     <div className="text-2xl font-minecraft text-foreground">
-                      {(avgChance * 100).toFixed(1)}%
+                      {(avgChance * 100).toFixed(3)}%
                     </div>
-                    <div className="text-sm text-muted-foreground">Probabilité</div>
+                    <div className="text-sm text-muted-foreground">Probabilité moyenne</div>
                   </div>
                 )}
                 {item.equipment_type && (
