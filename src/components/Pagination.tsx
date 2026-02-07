@@ -1,4 +1,5 @@
 import type { ChangeEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 export type PaginationProps = {
   currentPage: number;
@@ -17,6 +18,7 @@ export function Pagination({
   onPageChange,
   onItemsPerPageChange,
 }: PaginationProps) {
+  const { t } = useTranslation();
   if (totalPages <= 1) return null;
 
   const startItem = (currentPage - 1) * itemsPerPage + 1;
@@ -74,12 +76,10 @@ export function Pagination({
 
       <div className="flex items-center gap-3">
         <span className="text-base text-muted-foreground">
-          Affichage de <span className="font-semibold text-foreground">{startItem}</span> à{" "}
-          <span className="font-semibold text-foreground">{endItem}</span> sur{" "}
-          <span className="font-semibold text-foreground">{totalItems}</span>
+          {t("common.displayRange", { start: startItem, end: endItem, total: totalItems })}
         </span>
         <label className="flex items-center gap-2 text-base">
-          <span className="text-muted-foreground">Par page:</span>
+          <span className="text-muted-foreground">{t("common.perPage")}</span>
           <select
             value={itemsPerPage}
             onChange={(e: ChangeEvent<HTMLSelectElement>) => {
@@ -101,7 +101,7 @@ export function Pagination({
           onClick={() => onPageChange(1)}
           disabled={currentPage === 1}
           className="bg-secondary border-2 border-border text-foreground px-3 py-1.5 text-base font-medium transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-secondary"
-          aria-label="Première page"
+          aria-label={t("common.firstPage")}
         >
           ««
         </button>
@@ -109,7 +109,7 @@ export function Pagination({
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
           className="bg-secondary border-2 border-border text-foreground px-3 py-1.5 text-base font-medium transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-secondary"
-          aria-label="Page précédente"
+          aria-label={t("common.prevPage")}
         >
           ‹
         </button>
@@ -136,7 +136,7 @@ export function Pagination({
                     ? "border-primary bg-primary/20 text-primary"
                     : "border-border bg-secondary text-foreground hover:bg-muted"
                 }`}
-                aria-label={`Page ${pageNum}`}
+                aria-label={t("common.pageNum", { n: pageNum })}
                 aria-current={isActive ? "page" : undefined}
               >
                 {pageNum}
@@ -149,7 +149,7 @@ export function Pagination({
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
           className="bg-secondary border-2 border-border text-foreground px-3 py-1.5 text-base font-medium transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-secondary"
-          aria-label="Page suivante"
+          aria-label={t("common.nextPage")}
         >
           ›
         </button>
@@ -157,7 +157,7 @@ export function Pagination({
           onClick={() => onPageChange(totalPages)}
           disabled={currentPage === totalPages}
           className="bg-secondary border-2 border-border text-foreground px-3 py-1.5 text-base font-medium transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-secondary"
-          aria-label="Dernière page"
+          aria-label={t("common.lastPage")}
         >
           »»
         </button>

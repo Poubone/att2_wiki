@@ -1,4 +1,4 @@
-import type { EnrichedItem, ItemRecord, ItemsFile } from "../types";
+import type { EnrichedItem, ItemRecord, ItemsFile, OriginsFile } from "../types";
 
 function titleCaseWords(s: string) {
   return s
@@ -70,10 +70,35 @@ export function guessType(item: ItemRecord) {
   return "misc";
 }
 
-export function enrichItem(raw: ItemRecord): EnrichedItem {
+function buildOriginLabelMap(
+  origins: OriginsFile["origins"] | ItemsFile["bosses"]
+): Map<string, string> {
+  const map = new Map<string, string>();
+  const list = Array.isArray(origins) ? origins : [];
+  for (const b of list) {
+    if (b?.id != null && b?.label != null) map.set(b.id, b.label);
+  }
+  return map;
+}
+
+export function enrichItem(raw: ItemRecord, bossLabelMap?: Map<string, string>): EnrichedItem {
   const disp = raw.display || {};
   const labelName = disp.name_plain || disp.name_text || raw.item_id || "Objet sans nom";
-  const bosses = extractBossesFromSources(raw.sources);
+
+  let bosses: string[];
+  if (
+    Array.isArray(raw.dropped_by_bosses) &&
+    raw.dropped_by_bosses.length > 0 &&
+    bossLabelMap?.size
+  ) {
+    bosses = raw.dropped_by_bosses
+      .map((id) => bossLabelMap.get(id) ?? id)
+      .filter(Boolean);
+    bosses = [...new Set(bosses)].sort();
+  } else {
+    bosses = extractBossesFromSources(raw.sources);
+  }
+
   const typeKey = guessType(raw);
   const weaponSubtype = guessWeaponSubtype(raw);
   const sourcesCount = Array.isArray(raw.sources) ? raw.sources.length : 0;
@@ -81,39 +106,70 @@ export function enrichItem(raw: ItemRecord): EnrichedItem {
   return { ...raw, labelName, bosses, typeKey, weaponSubtype, sourcesCount, bossesCount };
 }
 
-export async function loadItemsFile(): Promise<{ file: ItemsFile; items: EnrichedItem[] }> {
-  const res = await fetch("/items.json");
-  if (!res.ok) throw new Error(`Impossible de charger items.json (${res.status})`);
-  const file = (await res.json()) as ItemsFile;
-  const items = (file.items || []).map(enrichItem);
-  return { file, items };
+export type LoadedData = {
+  file: ItemsFile;
+  items: EnrichedItem[];
+  origins: OriginsFile | null;
+};
+
+export async function loadItemsFile(): Promise<LoadedData> {
+  const [itemsRes, originsRes] = await Promise.all([
+    fetch("/items.json"),
+    fetch("/origins.json"),
+  ]);
+  if (!itemsRes.ok) throw new Error(`Impossible de charger items.json (${itemsRes.status})`);
+  const file = (await itemsRes.json()) as ItemsFile;
+
+  let origins: OriginsFile | null = null;
+  if (originsRes.ok) {
+    try {
+      origins = (await originsRes.json()) as OriginsFile;
+    } catch {
+      origins = null;
+    }
+  }
+
+  const originLabelMap =
+    origins?.origins?.length ? buildOriginLabelMap(origins.origins) : buildOriginLabelMap(file.bosses);
+  const items = (file.items || []).map((raw) => enrichItem(raw, originLabelMap));
+
+  return { file, items, origins };
 }
 
-export type SortKey = "name" | "rarity" | "sources" | "bosses";
+/** Ordre de rareté descendant (plus rare → moins rare). Codes du datapack. */
+const RARITY_ORDER_DESC = [
+  "myt",        // Mythic
+  "ult",        // Ultimate
+  "leg_armset", // Set Légendaire
+  "leg",        // Légendaire
+  "epi_set",    // Set Epic
+  "epi",        // Epic
+  "rar",        // Rare
+  "com",        // Commun
+  "unc",        // Uncommon
+  "unk",        // Unk
+  "spe",        // Spe
+  "cur",        // Cur
+  "misc",       // Misc
+  "que",        // Quest
+];
 
-export function sortItems(items: EnrichedItem[], sortKey: SortKey, dir: "asc" | "desc") {
-  const mul = dir === "asc" ? 1 : -1;
-  const rarityKey = (r?: string | null) => (r ?? "").toString();
+function rarityRank(r?: string | null): number {
+  if (r == null || r === "") return RARITY_ORDER_DESC.length;
+  const key = String(r).toLowerCase().trim();
+  const idx = RARITY_ORDER_DESC.indexOf(key);
+  return idx === -1 ? RARITY_ORDER_DESC.length : idx;
+}
+
+export type SortKey = "rarity";
+
+/** Tri par rareté uniquement. desc = plus rare au moins rare (défaut), asc = moins rare au plus rare */
+export function sortItems(items: EnrichedItem[], _sortKey: SortKey, dir: "asc" | "desc") {
+  const mul = dir === "desc" ? 1 : -1;
   return [...items].sort((a, b) => {
-    let cmp = 0;
-    switch (sortKey) {
-      case "name":
-        cmp = a.labelName.localeCompare(b.labelName, "fr");
-        break;
-      case "rarity":
-        cmp = rarityKey(a.rarity).localeCompare(rarityKey(b.rarity), "fr");
-        break;
-      case "sources":
-        cmp = a.sourcesCount - b.sourcesCount;
-        break;
-      case "bosses":
-        cmp = a.bossesCount - b.bossesCount;
-        break;
-      default:
-        cmp = 0;
-    }
-    if (cmp === 0) cmp = a.key.localeCompare(b.key);
-    return cmp * mul;
+    const cmp = rarityRank(a.rarity) - rarityRank(b.rarity);
+    if (cmp !== 0) return cmp * mul;
+    return a.key.localeCompare(b.key);
   });
 }
 

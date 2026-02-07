@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type { EnrichedItem } from "../types";
 import { humanize } from "../lib/items";
 import { detectSet } from "../lib/sets";
@@ -8,7 +9,7 @@ import {
   hasBaseStats,
   hasSetStats,
 } from "../lib/stats";
-import { normalizeRarity, RARITY_BG, RARITY_BORDER, RARITY_COLORS } from "../lib/rarity";
+import { normalizeRarity, RARITY_COLORS, getIconColor } from "../lib/rarity";
 import { getStatEmoji } from "../lib/statEmojis";
 import { MinecraftText } from "./MinecraftText";
 import { Sword, Shield, Pickaxe, FlaskConical, Gem, Box, Sparkles } from "lucide-react";
@@ -23,6 +24,7 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
 };
 
 export function ItemCard({ item }: { item: EnrichedItem }) {
+  const { t } = useTranslation();
   // Utiliser lore_text (avec couleurs) si disponible, sinon lore_plain
   const loreLines = item.display?.lore_text || item.display?.lore_plain || [];
 
@@ -34,8 +36,6 @@ export function ItemCard({ item }: { item: EnrichedItem }) {
 
   // Normaliser la rareté et obtenir les styles
   const rarity = normalizeRarity(item.rarity);
-  const rarityBg = RARITY_BG[rarity];
-  const rarityBorder = RARITY_BORDER[rarity];
   const rarityColor = RARITY_COLORS[rarity];
 
   // Détecter si c'est de l'argent (contient "coins" ou "chronoton" dans le nom ou la description)
@@ -54,10 +54,12 @@ export function ItemCard({ item }: { item: EnrichedItem }) {
     Icon = FlaskConical; // Potion pour les consommables/potions
   }
 
+  const iconColor = getIconColor(item);
+
   return (
     <Link
       to={`/items/${item.key}`}
-      className={`group relative block p-4 border-2 ${rarityBorder} ${rarityBg} bg-card hover:bg-secondary/50 transition-all duration-200 cursor-pointer hover:scale-[1.02] hover:shadow-lg hover:shadow-black/30`}
+      className={`group relative block p-4 border-2 bg-card  border-gray-500 hover:bg-secondary/50 transition-all duration-200 cursor-pointer hover:scale-[1.02] hover:shadow-lg hover:shadow-black/30`}
       style={{ imageRendering: 'pixelated' }}
     >
       {/* Pixel corner decorations */}
@@ -76,22 +78,9 @@ export function ItemCard({ item }: { item: EnrichedItem }) {
       )}
 
       <div className="flex items-start gap-4">
-        {/* Item Icon avec couleur selon rareté */}
-        <div 
-          className={`w-16 h-16 flex items-center justify-center ${rarityBg} border-2 ${rarityBorder} shrink-0`}
-        >
-          <Icon 
-            className="w-10 h-10 stroke-2"
-            style={{
-              stroke: rarity === 'common' ? '#d1d5db' : 
-                      rarity === 'uncommon' ? '#4ade80' : 
-                      rarity === 'rare' ? '#60a5fa' : 
-                      rarity === 'epic' ? '#a78bfa' : 
-                      rarity === 'legendary' ? '#facc15' : 
-                      '#9ca3af',
-              fill: 'none'
-            }}
-          />
+        {/* Item Icon : couleur forcée en style inline pour que le SVG (stroke: currentColor) l’hérite */}
+        <div className="w-16 h-16 flex items-center justify-center bg-gray-600/20 border-2 border-gray-500 shrink-0">
+          <Icon className={`w-8 h-8 ${iconColor.className ?? ""}`.trim()} style={iconColor.style} />
         </div>
 
         {/* Item Info */}
@@ -107,10 +96,10 @@ export function ItemCard({ item }: { item: EnrichedItem }) {
             )}
           </div>
           <p className="text-base text-muted-foreground capitalize mt-1">
-            {item.rarity ? humanize(item.rarity) : "Rareté inconnue"} • {humanize(item.typeKey)}
+            {item.rarity ? humanize(item.rarity) : t("common.rarityUnknown")} • {item.typeKey ? humanize(item.typeKey) : t("common.unknown")}
           </p>
           {isSet && setName && (
-            <p className="text-sm text-purple-300/80 mt-1">Set: {setName}</p>
+            <p className="text-sm text-purple-300/80 mt-1">{t("common.setLabel")}: {setName}</p>
           )}
           <p className="text-sm text-muted-foreground/70 mt-1 truncate">{item.item_id}</p>
 
@@ -123,7 +112,7 @@ export function ItemCard({ item }: { item: EnrichedItem }) {
                 </p>
               ))
             ) : (
-              <p className="text-base italic text-muted-foreground/70">Pas de description.</p>
+              <p className="text-base italic text-muted-foreground/70">{t("common.noDescription")}</p>
             )}
           </div>
 
@@ -166,7 +155,7 @@ export function ItemCard({ item }: { item: EnrichedItem }) {
                           ? "bg-gradient-to-r from-red-500/40 to-red-600/40 text-red-100 border-2 border-red-400/60"
                           : "bg-gradient-to-r from-gray-500/40 to-gray-600/40 text-gray-100 border-2 border-gray-400/60"
                     }`}
-                    title={`Stat du set: ${statName} ${formatStatValue(value)}`}
+                    title={t("common.statSetTitle", { stat: statName, value: formatStatValue(value) })}
                   >
                     ⭐ {getStatEmoji(statName)} {statName} {formatStatValue(value)}
                   </span>

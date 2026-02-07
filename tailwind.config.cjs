@@ -1,6 +1,27 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  safelist: [
+    /* Couleurs rareté et couleurs nom Minecraft (icônes dynamiques) */
+    "text-gray-300",
+    "text-gray-400",
+    "text-gray-500",
+    "text-gray-600",
+    "text-gray-800",
+    "text-white",
+    "text-green-400",
+    "text-green-800",
+    "text-blue-400",
+    "text-blue-900",
+    "text-purple-400",
+    "text-purple-900",
+    "text-yellow-300",
+    "text-yellow-400",
+    "text-red-400",
+    "text-red-900",
+    "text-cyan-400",
+    "text-cyan-800",
+  ],
   theme: {
     extend: {
       fontFamily: {

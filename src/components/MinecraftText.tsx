@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
-const MC_COLORS: Record<string, string> = {
+/** Couleurs § (Minecraft) → hex. Utilisé pour le nom et pour l’icône (même couleur). */
+export const MC_COLORS: Record<string, string> = {
   "0": "#000000", // noir
   "1": "#0000AA", // bleu foncé
   "2": "#00AA00", // vert foncé
@@ -20,6 +21,25 @@ const MC_COLORS: Record<string, string> = {
 };
 
 const SECTION = "\u00A7"; // §
+
+/**
+ * Retourne la première couleur (hex) trouvée dans un texte avec codes §, comme pour le nom affiché.
+ * Utilisé pour appliquer la même couleur à l’icône.
+ */
+export function getFirstColorFromMinecraftText(text: string | null | undefined): string | null {
+  if (!text || typeof text !== "string") return null;
+  let i = 0;
+  while (i < text.length) {
+    if ((text[i] === SECTION || text[i] === "\u00A7") && i + 1 < text.length) {
+      const code = text[i + 1].toLowerCase();
+      if (MC_COLORS[code]) return MC_COLORS[code];
+      i += 2;
+    } else {
+      i++;
+    }
+  }
+  return null;
+}
 
 type FormatState = {
   color?: string;

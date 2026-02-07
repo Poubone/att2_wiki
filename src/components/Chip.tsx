@@ -7,7 +7,7 @@ export function Chip({
   className,
 }: {
   children: ReactNode;
-  variant?: "default" | "rarity" | "type" | "boss";
+  variant?: "default" | "rarity" | "type" | "boss" | "elite";
   className?: string;
 }) {
   const base =
@@ -17,6 +17,7 @@ export function Chip({
     rarity: "border-primary/50 bg-primary/20 text-primary",
     type: "border-green-400/50 bg-green-500/20 text-green-200",
     boss: "border-orange-400/50 bg-orange-500/20 text-orange-200",
+    elite: "border-amber-400/50 bg-amber-500/20 text-amber-200",
   };
 
   return <span className={clsx(base, variants[variant], className)}>{children}</span>;

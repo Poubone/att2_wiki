@@ -1,4 +1,5 @@
 import type { ChangeEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { Search } from "lucide-react";
 import { humanize } from "../lib/items";
 
@@ -6,9 +7,11 @@ export type FiltersState = {
   search: string;
   rarity: string;
   boss: string;
-  sortKey: "name" | "rarity" | "sources" | "bosses";
+  zone: string;
   sortDir: "asc" | "desc";
 };
+
+export type BossOption = { id: string; label: string };
 
 export function FiltersBar({
   value,
@@ -20,9 +23,10 @@ export function FiltersBar({
   value: FiltersState;
   onChange: (next: FiltersState) => void;
   rarities: string[];
-  bosses: string[];
+  bosses: BossOption[];
   summary: string;
 }) {
+  const { t } = useTranslation();
   const update = (patch: Partial<FiltersState>) => onChange({ ...value, ...patch });
 
   const onInput =
@@ -41,28 +45,28 @@ export function FiltersBar({
       <div className="absolute bottom-0 right-0 w-3 h-3 bg-border" />
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
-        <label className="md:col-span-5">
-          <div className="mb-1 text-sm uppercase tracking-wider text-muted-foreground">Recherche</div>
+        <label className="md:col-span-4">
+          <div className="mb-1 text-sm uppercase tracking-wider text-muted-foreground">{t("filters.search")}</div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <input
               value={value.search}
               onChange={onInput("search")}
               type="search"
-              placeholder="Rechercher un item..."
+              placeholder={t("filters.searchPlaceholder")}
               className="w-full pl-10 bg-input border-2 border-border text-foreground placeholder:text-muted-foreground text-lg h-12 outline-none focus:border-primary"
             />
           </div>
         </label>
 
         <label className="md:col-span-2">
-          <div className="mb-1 text-sm uppercase tracking-wider text-muted-foreground">Rareté</div>
+          <div className="mb-1 text-sm uppercase tracking-wider text-muted-foreground">{t("filters.rarity")}</div>
           <select
             value={value.rarity}
             onChange={onInput("rarity")}
             className="w-full bg-input border-2 border-border text-foreground px-3 py-2 text-base outline-none focus:border-primary"
           >
-            <option value="">Toutes</option>
+            <option value="">{t("filters.all")}</option>
             {rarities.map((r) => (
               <option key={r} value={r}>
                 {humanize(r)}
@@ -72,44 +76,45 @@ export function FiltersBar({
         </label>
 
         <label className="md:col-span-2">
-          <div className="mb-1 text-sm uppercase tracking-wider text-muted-foreground">Boss</div>
+          <div className="mb-1 text-sm uppercase tracking-wider text-muted-foreground">{t("common.boss")}</div>
           <select
             value={value.boss}
             onChange={onInput("boss")}
             className="w-full bg-input border-2 border-border text-foreground px-3 py-2 text-base outline-none focus:border-primary"
           >
-            <option value="">Tous</option>
+            <option value="">{t("filters.allBosses")}</option>
             {bosses.map((b) => (
-              <option key={b} value={b}>
-                {b}
+              <option key={b.id} value={b.id}>
+                {b.label}
               </option>
             ))}
           </select>
         </label>
 
-        <label className="md:col-span-3">
-          <div className="mb-1 text-sm uppercase tracking-wider text-muted-foreground">Trier par</div>
+        <label className="md:col-span-2">
+          <div className="mb-1 text-sm uppercase tracking-wider text-muted-foreground">{t("filters.zone")}</div>
           <select
-            value={value.sortKey}
-            onChange={onInput("sortKey")}
+            value={value.zone}
+            onChange={onInput("zone")}
             className="w-full bg-input border-2 border-border text-foreground px-3 py-2 text-base outline-none focus:border-primary"
           >
-            <option value="name">Nom</option>
-            <option value="rarity">Rareté</option>
-            <option value="sources">Nb de sources</option>
-            <option value="bosses">Nb de boss</option>
+            <option value="">{t("filters.allZones")}</option>
+            <option value="1">{t("filters.zoneN", { n: 1 })}</option>
+            <option value="2">{t("filters.zoneN", { n: 2 })}</option>
+            <option value="3">{t("filters.zoneN", { n: 3 })}</option>
+            <option value="4">{t("filters.zoneN", { n: 4 })}</option>
           </select>
         </label>
 
         <label className="md:col-span-2">
-          <div className="mb-1 text-sm uppercase tracking-wider text-muted-foreground">Ordre</div>
+          <div className="mb-1 text-sm uppercase tracking-wider text-muted-foreground">{t("filters.order")}</div>
           <select
             value={value.sortDir}
             onChange={onInput("sortDir")}
             className="w-full bg-input border-2 border-border text-foreground px-3 py-2 text-base outline-none focus:border-primary"
           >
-            <option value="asc">Ascendant</option>
-            <option value="desc">Descendant</option>
+            <option value="desc">{t("filters.orderRarityDesc")}</option>
+            <option value="asc">{t("filters.orderRarityAsc")}</option>
           </select>
         </label>
 

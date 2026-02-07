@@ -66,7 +66,15 @@ coverage/
 # ESLint
 .eslintcache
 
+# Datapack (données volumineuses, générées par le script Python)
+adventquest_functions/
+adventquest_item_modifiers/
+adventquest_loot_tables/
+
 # Autres
+minecraft-item-wiki/
 *.pem
 .vercel
 .netlify
+
+*.pyc

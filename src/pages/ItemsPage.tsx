@@ -1,32 +1,42 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Book, Pickaxe } from "lucide-react";
 import { FiltersBar, type FiltersState } from "../components/FiltersBar";
 import { ItemCard } from "../components/ItemCard";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { Pagination } from "../components/Pagination";
 import { loadItemsFile, sortItems } from "../lib/items";
+import type { BossOption } from "../components/FiltersBar";
 import type { EnrichedItem } from "../types";
+import type { OriginsFile } from "../types";
 
-function buildOptions(items: EnrichedItem[]) {
+function buildOptions(items: EnrichedItem[], origins: OriginsFile | null) {
   const rarities = new Set<string>();
   const types = new Set<string>();
   const weaponSubtypes = new Set<string>();
-  const bosses = new Set<string>();
   for (const it of items) {
     if (it.rarity) rarities.add(it.rarity);
     if (it.typeKey) {
       types.add(it.typeKey);
-      // Si c'est une arme et qu'on a un sous-type, l'ajouter
       if (it.typeKey === "weapon" && it.weaponSubtype) {
         weaponSubtypes.add(it.weaponSubtype);
       }
     }
-    for (const b of it.bosses) bosses.add(b);
   }
+
+  const bosses: BossOption[] = origins?.origins?.length
+    ? origins.origins
+        .map((o) => ({ id: o.id, label: o.label }))
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }))
+    : Array.from(new Set(items.flatMap((it) => it.bosses)))
+        .sort()
+        .map((label) => ({ id: label, label }));
+
   return {
     rarities: Array.from(rarities).sort(),
     types: Array.from(types).sort(),
     weaponSubtypes: Array.from(weaponSubtypes).sort(),
-    bosses: Array.from(bosses).sort(),
+    bosses,
   };
 }
 
@@ -34,11 +44,39 @@ function normalize(s: string) {
   return (s || "").toLowerCase();
 }
 
-function applyFilters(items: EnrichedItem[], f: FiltersState) {
+function applyFilters(
+  items: EnrichedItem[],
+  f: FiltersState,
+  filterBossById: boolean,
+  origins: OriginsFile | null
+) {
   const q = normalize(f.search);
+  const bossOrigin =
+    filterBossById && f.boss && origins?.origins?.length
+      ? origins.origins.find((o) => o.id === f.boss)
+      : null;
+  const bossItemKeys = bossOrigin?.item_keys ? new Set(bossOrigin.item_keys) : null;
+
+  const zoneNum = f.zone ? parseInt(f.zone, 10) : 0;
+
   return items.filter((it) => {
     if (f.rarity && it.rarity !== f.rarity) return false;
-    if (f.boss && !it.bosses.includes(f.boss)) return false;
+    if (f.boss) {
+      if (bossItemKeys) {
+        if (!bossItemKeys.has(it.key)) return false;
+      } else if (filterBossById) {
+        if (!it.dropped_by_bosses?.includes(f.boss)) return false;
+      } else {
+        if (!it.bosses.includes(f.boss)) return false;
+      }
+    }
+    if (zoneNum >= 1 && zoneNum <= 4) {
+      const sources = it.sources || [];
+      const hasZone = sources.some(
+        (s) => typeof s === "object" && "zone" in s && s.zone === zoneNum
+      );
+      if (!hasZone) return false;
+    }
 
     if (!q) return true;
     const disp = it.display || {};
@@ -49,25 +87,19 @@ function applyFilters(items: EnrichedItem[], f: FiltersState) {
 }
 
 export default function ItemsPage() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<EnrichedItem[]>([]);
+  const [origins, setOrigins] = useState<OriginsFile | null>(null);
 
   const [filters, setFilters] = useState<FiltersState>({
     search: "",
     rarity: "",
     boss: "",
-    sortKey: "name",
-    sortDir: "asc",
+    zone: "",
+    sortDir: "desc",
   });
-
-  // S'assurer que sortKey est toujours valide (au cas où une valeur invalide serait stockée)
-  useEffect(() => {
-    const validSortKeys: FiltersState["sortKey"][] = ["name", "rarity", "sources", "bosses"];
-    if (!validSortKeys.includes(filters.sortKey)) {
-      setFilters(prev => ({ ...prev, sortKey: "name" }));
-    }
-  }, [filters.sortKey]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
@@ -78,12 +110,12 @@ export default function ItemsPage() {
       try {
         setLoading(true);
         setError(null);
-        const { items } = await loadItemsFile();
+        const { items: loadedItems, origins: loadedOrigins } = await loadItemsFile();
         if (!mounted) return;
-        setItems(items);
+        setItems(loadedItems);
+        setOrigins(loadedOrigins ?? null);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Erreur inconnue";
-        setError(msg);
+        setError(e instanceof Error ? e.message : "");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -93,17 +125,22 @@ export default function ItemsPage() {
     };
   }, []);
 
-  const options = useMemo(() => buildOptions(items), [items]);
+  const options = useMemo(() => buildOptions(items, origins), [items, origins]);
 
-  const filtered = useMemo(() => applyFilters(items, filters), [items, filters]);
-  const sorted = useMemo(() => {
-    return sortItems(filtered, filters.sortKey, filters.sortDir);
-  }, [filtered, filters.sortKey, filters.sortDir]);
+  const filterBossById = !!origins?.origins?.length;
+  const filtered = useMemo(
+    () => applyFilters(items, filters, filterBossById, origins),
+    [items, filters, filterBossById, origins]
+  );
+  const sorted = useMemo(
+    () => sortItems(filtered, "rarity", filters.sortDir),
+    [filtered, filters.sortDir]
+  );
 
   // Réinitialiser la page à 1 quand les filtres changent
   useEffect(() => {
     setCurrentPage(1);
-  }, [filters.search, filters.rarity, filters.boss, filters.sortKey, filters.sortDir]);
+  }, [filters.search, filters.rarity, filters.boss, filters.zone, filters.sortDir]);
 
   // Calculer la pagination
   const totalPages = Math.max(1, Math.ceil(sorted.length / itemsPerPage));
@@ -119,29 +156,32 @@ export default function ItemsPage() {
   }, [currentPage, totalPages]);
 
   const summary = loading
-    ? "Chargement…"
+    ? t("common.loading")
     : error
-      ? `Erreur: ${error}`
-      : `${sorted.length} objet(s) trouvé(s) sur ${items.length} total`;
+      ? `${t("common.error")}: ${error || t("common.errorUnknown")}`
+      : t("home.summary", { count: sorted.length, total: items.length });
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b-4 border-border bg-card sticky top-0 z-20">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-primary/20 border-4 border-primary flex items-center justify-center">
-              <Book className="w-10 h-10 text-primary" />
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-primary/20 border-4 border-primary flex items-center justify-center">
+                <Book className="w-10 h-10 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-4xl md:text-5xl font-minecraft text-accent">
+                  {t("home.title")}
+                </h1>
+                <p className="text-lg text-muted-foreground flex items-center gap-2">
+                  <Pickaxe className="w-4 h-4" />
+                  {t("home.subtitle")}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-4xl md:text-5xl font-minecraft text-accent">
-                Datapack Wiki
-              </h1>
-              <p className="text-lg text-muted-foreground flex items-center gap-2">
-                <Pickaxe className="w-4 h-4" />
-                Wiki des items d'Across the Time 2
-              </p>
-            </div>
+            <LanguageSwitcher />
           </div>
         </div>
       </header>
@@ -164,6 +204,14 @@ export default function ItemsPage() {
           {/* Items Grid */}
           {!loading && !error && sorted.length > 0 ? (
             <>
+              {filters.boss && (
+                <div className="p-4 bg-primary/10 border-2 border-primary text-foreground rounded-sm">
+                  <p className="text-sm font-medium text-primary mb-1">
+                    {options.bosses.find((b) => b.id === filters.boss)?.label ?? filters.boss}
+                  </p>
+                  <p className="text-muted-foreground text-sm">{t("home.bossDropMechanic")}</p>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {paginatedItems.map((it) => (
                   <ItemCard key={it.key} item={it} />
@@ -180,18 +228,20 @@ export default function ItemsPage() {
             </>
           ) : !loading && !error && sorted.length === 0 ? (
             <div className="text-center py-12 bg-card border-2 border-border p-8">
-              <p className="text-xl text-muted-foreground">Aucun item trouvé</p>
+              <p className="text-xl text-muted-foreground">{t("home.noItems")}</p>
               <p className="text-muted-foreground mt-2">
-                Essayez de modifier vos filtres de recherche
+                {t("home.noItemsHint")}
               </p>
             </div>
           ) : loading ? (
             <div className="text-center py-12">
-              <p className="text-xl text-muted-foreground">Chargement…</p>
+              <p className="text-xl text-muted-foreground">{t("common.loading")}</p>
             </div>
           ) : error ? (
             <div className="text-center py-12 bg-card border-2 border-destructive p-8">
-              <p className="text-xl text-destructive">Erreur: {error}</p>
+              <p className="text-xl text-destructive">
+                {t("common.error")}: {error || t("common.errorUnknown")}
+              </p>
             </div>
           ) : null}
         </div>
@@ -200,9 +250,7 @@ export default function ItemsPage() {
       {/* Footer */}
       <footer className="border-t-4 border-border bg-card mt-12">
         <div className="container mx-auto px-4 py-6 text-center">
-          <p className="text-muted-foreground">
-            Datapack Wiki • Fait par Poubone
-          </p>
+          <p className="text-muted-foreground">{t("home.footer")}</p>
         </div>
       </footer>
     </div>
